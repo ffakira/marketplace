@@ -102,6 +102,32 @@ contract("Marketplace", async([deployer, account1, ...acounts]) => {
             web3.utils.toWei(web3.utils.toBN(100), "ether")
         );
 
+        const offer = await marketplaceInstance.listOffers.call(deployer);
+        expect(true).to.equal(offer.tokenId.eq(web3.utils.toBN(1)));
+        expect(true).to.equal(offer.amount.eq(web3.utils.toWei(web3.utils.toBN(100), "ether")));
+        expect(false).to.equal(offer.closeOffer);
+        expect(testNFTInstance.address).to.equal(offer.nft);
 
+        const confirmOwnership = await testNFTInstance.ownerOf(web3.utils.toBN(1));
+        expect(confirmOwnership).to.equal(marketplaceInstance.address);
+    });
+
+    it("should delist the NFT from the marketplace", async() => {
+        const marketplaceInstance = await Marketplace.deployed();
+        const testNFTInstance = await TestNFT.deployed();
+
+        // @dev Marketplace contains the user's NFT
+        let marketplaceBalance = await testNFTInstance.balanceOf(marketplaceInstance.address);
+        expect(true).to.equal(marketplaceBalance.eq(web3.utils.toBN(1)));
+
+        await marketplaceInstance.delistNft(testNFTInstance.address, web3.utils.toBN(1));
+        marketplaceBalance = await testNFTInstance.balanceOf(marketplaceInstance.address);
+        expect(true).to.equal(marketplaceBalance.eq(web3.utils.toBN(0)));
+
+        const deployerNFTBalance = await testNFTInstance.balanceOf(deployer);
+        expect(true).to.equal(deployerNFTBalance.eq(web3.utils.toBN(1)));
+
+        const confirmOwnership = await testNFTInstance.ownerOf(web3.utils.toBN(1));
+        expect(confirmOwnership).to.equal(deployer);
     });
 });

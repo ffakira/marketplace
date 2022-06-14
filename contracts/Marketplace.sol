@@ -20,7 +20,21 @@ contract Marketplace is Context, IERC721Receiver {
         bool closeOffer;
     }
 
+    event ListNft(
+        address indexed owner,
+        address indexed nft,
+        uint256 indexed tokenId,
+        uint256 offerPrice
+    );
+
+    event DelistNft(
+        address indexed owner,
+        address indexed nft,
+        uint256 indexed tokenId
+    );
+
     mapping(address => List) public listOffers;
+    mapping(address => mapping(uint256 => Offer)) public biddingOffers;
 
     function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data) external returns (bytes4) {
         return this.onERC721Received.selector;
@@ -34,10 +48,16 @@ contract Marketplace is Context, IERC721Receiver {
         listOffers[_msgSender()].closeOffer = false;
 
         IERC721(_nft).safeTransferFrom(_msgSender(), address(this), _tokenId);
+        emit ListNft(_msgSender(), _nft, _tokenId, _offerPrice);
     }
 
     function delistNft(address _nft, uint256 _tokenId) public {
         IERC721(_nft).approve(_msgSender(), _tokenId);
         IERC721(_nft).safeTransferFrom(address(this), _msgSender(), _tokenId);
+        emit DelistNft(_msgSender(), _nft, _tokenId);
+    }
+
+    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) public {
+
     }
 }
