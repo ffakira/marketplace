@@ -1,4 +1,3 @@
-const Migrations = artifacts.require("Migrations");
 const TestToken = artifacts.require("test/TestToken");
 const Treasury = artifacts.require("Treasury");
 const Marketplace = artifacts.require("Marketplace");
@@ -6,38 +5,6 @@ const TestNFT = artifacts.require("test/TestNFT");
 
 const truffleAssert = require("truffle-assertions");
 const web3 = require("web3");
-
-contract("Migrations", ([deployer, account1, ...accounts]) => {
-    it("should get the correct deployer", async() => {
-        const migrationsInstance = await Migrations.deployed();
-        const getOwner = await migrationsInstance.owner.call();
-        expect(getOwner).to.equal(deployer);
-    });
-
-    it("should allow to modify the last completed migration", async() => {
-        const migrationsInstance = await Migrations.deployed();
-        let getLastCompletedMigration = await migrationsInstance.last_completed_migration.call();
-
-        // @dev Checks the default value of Migrations.sol
-        expect(true).to.equal(getLastCompletedMigration.eq(web3.utils.toBN(1)));
-
-        // @dev update last_completed_migration = 2
-        await migrationsInstance.setCompleted(web3.utils.toBN(2), {from: deployer});
-        getLastCompletedMigration = await migrationsInstance.last_completed_migration.call();
-        expect(true).to.equal(getLastCompletedMigration.eq(web3.utils.toBN(2)));
-    });
-
-    it("should fail to modify the last completed migration", async() => {
-        const migrationsInstance = await Migrations.deployed();
-
-        await truffleAssert.fails(
-            migrationsInstance.setCompleted(
-                web3.utils.toBN(2), {from: account1}
-            ),
-            "Ownable: caller is not the owner"
-        );
-    });
-});
 
 contract("Treasury and TestToken", ([deployer, account1, ...accounts]) => {
     it("should return 1_000_000 ether minted back to deployer.", async() => {
@@ -96,15 +63,17 @@ contract("Marketplace", async([deployer, account1, ...acounts]) => {
         const deployerNftBalance = await testNFTInstance.balanceOf(deployer);
         expect(true).to.equal(deployerNftBalance.eq(web3.utils.toBN(1)));
 
+        const nftPrice = web3.utils.toBN(10);
+
         await marketplaceInstance.listNft(
             testNFTInstance.address, 
             web3.utils.toBN(1), 
-            web3.utils.toWei(web3.utils.toBN(100), "ether")
+            web3.utils.toWei(nftPrice, "ether")
         );
 
         const offer = await marketplaceInstance.listOffers.call(deployer);
         expect(true).to.equal(offer.tokenId.eq(web3.utils.toBN(1)));
-        expect(true).to.equal(offer.amount.eq(web3.utils.toWei(web3.utils.toBN(100), "ether")));
+        expect(true).to.equal(offer.amount.eq(web3.utils.toWei(nftPrice, "ether")));
         expect(false).to.equal(offer.closeOffer);
         expect(testNFTInstance.address).to.equal(offer.nft);
 
@@ -129,5 +98,10 @@ contract("Marketplace", async([deployer, account1, ...acounts]) => {
 
         const confirmOwnership = await testNFTInstance.ownerOf(web3.utils.toBN(1));
         expect(confirmOwnership).to.equal(deployer);
+    });
+
+    it("account1 should make a bid", async() => {
+        const marketplaceInstance = await Marketplace.deployed();
+        const testNFTInstance = await TestNFT.deployed();
     });
 });
