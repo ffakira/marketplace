@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: UNLICENSED
+//SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
+/**
+ * @title Marketplace
+ * @notice The smart contract have not been audited. Use at your own risk!
+ */
 contract Marketplace is Context, IERC721Receiver {
     struct Offer {
         address buyer;
@@ -33,13 +37,30 @@ contract Marketplace is Context, IERC721Receiver {
         uint256 indexed tokenId
     );
 
-    mapping(address => List) public listOffers;
-    mapping(address => mapping(uint256 => Offer)) public biddingOffers;
+    event BiddingOffer(
+        address indexed nft,
+        address indexed offerPrice,
+        uint256 indexed tokenId,
+        address buyer
+    );
 
+    mapping(address => List) public listOffers;
+    mapping(address => mapping(uint256 => Offer[])) public biddingOffers;
+
+    /**
+     * @dev `onERC221Received` is a required function in order to transfer to Marketplace smart contract
+     */
     function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data) external returns (bytes4) {
         return this.onERC721Received.selector;
     }
 
+    /**
+     * @notice Is not tested if it supports ERC1155
+     * @dev Transfers ERC721 to Marketplace contract
+     * @param _nft address of ERC721
+     * @param _tokenId uint tokenId of ERC721
+     * @param _offerPrice price to offer in wei
+     */
     function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice) public {
         listOffers[_msgSender()].nft = _nft;
         listOffers[_msgSender()].tokenId = _tokenId;
@@ -51,13 +72,29 @@ contract Marketplace is Context, IERC721Receiver {
         emit ListNft(_msgSender(), _nft, _tokenId, _offerPrice);
     }
 
+    /**
+     * @notice Is not tested if it supports ERC1155
+     * @dev Transfers ERC721 back to sender
+     * @param _nft address of ERC721
+     * @param _tokenId uint tokenId of ERC721
+     */
     function delistNft(address _nft, uint256 _tokenId) public {
         IERC721(_nft).approve(_msgSender(), _tokenId);
         IERC721(_nft).safeTransferFrom(address(this), _msgSender(), _tokenId);
+
+        delete listOffers[_msgSender()];
         emit DelistNft(_msgSender(), _nft, _tokenId);
     }
 
-    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) public {
+    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) public payable {
+        (bool sent,) = address(this).call{value: _offerPrice}("");
+        require(sent, "Marketplace: Failed to send ether");
+        require(true, "Marketplace: Bid higher then the floor price");
 
+        biddingOffers[_nft][_tokenId].push(Offer({
+            buyer: _msgSender(),
+            offerPrice: _offerPrice
+        }));
+        emit BiddingOffer(_msgSender(), _nft, _offerPrice, _tokenId);
     }
 }
