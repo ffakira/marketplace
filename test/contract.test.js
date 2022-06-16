@@ -1,107 +1,107 @@
-const TestToken = artifacts.require("test/TestToken");
-const Treasury = artifacts.require("Treasury");
-const Marketplace = artifacts.require("Marketplace");
-const TestNFT = artifacts.require("test/TestNFT");
-
+/**
+ * @author HashGlasses Team
+ */
+const { BigNumber } = require("@ethersproject/bignumber");
+const { ethers } = require("hardhat");
+const { expect } = require("chai");
 const truffleAssert = require("truffle-assertions");
-const web3 = require("web3");
 
-contract("Treasury and TestToken", ([deployer, account1, ...accounts]) => {
-    it("should return 1_000_000 ether minted back to deployer.", async() => {
-        const testTokenInstance = await TestToken.deployed();
-        const balanceOf = await testTokenInstance.balanceOf(deployer);
-        expect(true).to.equal(balanceOf.eq(web3.utils.toWei(web3.utils.toBN(1_000_000), "ether")));
+describe("Treasury and TestToken", function() {
+    beforeEach(async function() {
+        [this.deployer, ...this.accounts] = await ethers.getSigners();
+
+        const TestToken = await ethers.getContractFactory("TestToken");
+        const Treasury = await ethers.getContractFactory("Treasury");
+
+        this.testToken = await TestToken.deploy();
+        this.treasury = await Treasury.deploy();
     });
 
-    it("should transfer 100 wei to treasury contract", async() => {
-        const testTokenInstance = await TestToken.deployed();
-        const treasuryInstance = await Treasury.deployed();
-        
+    it("should return 1_000_000 ether minted back to deployer.", async function() {
+        const balanceOf = await this.testToken.balanceOf(this.deployer.address);
+        expect(balanceOf).to.deep.equal(BigNumber.from(ethers.utils.parseEther("1000000")));
+    });
+
+    it("should transfer 100 wei to treasury contract", async function() {
         // @dev treasury balance of TToken = 0 wei
-        let treasuryBalance = await testTokenInstance.balanceOf(treasuryInstance.address);
-        expect(true).to.equal(treasuryBalance.eq(web3.utils.toBN(0)));
+        let treasuryBalance = await this.testToken.balanceOf(this.treasury.address);
+        expect(treasuryBalance).to.deep.equal(BigNumber.from("0"));
 
         // @dev approve TToken and transfer to Treasury contract
-        await testTokenInstance.approve(deployer, web3.utils.toBN(100), {from: deployer});
-        await testTokenInstance.transferFrom(deployer, treasuryInstance.address, web3.utils.toBN(100), {from: deployer});
+        await this.testToken.approve(this.deployer.address, BigNumber.from("100"));
+        await this.testToken.transferFrom(this.deployer.address, this.treasury.address, BigNumber.from("100"));
 
         // @dev treasury balance of TToken = 100 wei
-        treasuryBalance = await testTokenInstance.balanceOf(treasuryInstance.address);
-        expect(true).to.equal(treasuryBalance.eq(web3.utils.toBN(100)));
+        treasuryBalance = await this.testToken.balanceOf(this.treasury.address);
+        expect(treasuryBalance).to.deep.equal(BigNumber.from("100"));
     });
 
-    it("should remove 25 wei from removeFunds", async() => {
-        const testTokenInstance = await TestToken.deployed();
-        const treasuryInstance = await Treasury.deployed();
+    it("should remove 25 wei from removeFunds", async function() {
+        // @dev treasury balance of TToken = 100 wei
+        await this.testToken.approve(this.deployer.address, BigNumber.from("100"));
+        await this.testToken.transferFrom(this.deployer.address, this.treasury.address, BigNumber.from("100"));
 
-        await treasuryInstance.removeFunds(testTokenInstance.address, web3.utils.toBN(25), {from: deployer});
-        const treasuryBalance = await testTokenInstance.balanceOf(treasuryInstance.address);
-        expect(true).to.equal(treasuryBalance.eq(web3.utils.toBN(75)));
+        // @dev treasury balance of TToken = 75 wei
+        await this.treasury.removeFunds(this.testToken.address, BigNumber.from("25"));
+        const treasuryBalance = await this.testToken.balanceOf(this.treasury.address);
+        expect(treasuryBalance).to.deep.equal(BigNumber.from("75"));
     });
-
-    it("should fail if you try to remove funds from non-deployer address", async() => {
-        const testTokenInstance = await TestToken.deployed();
-        const treasuryInstance = await Treasury.deployed();
-
+    
+    it("should fail if you try to remove funds from non-deployer address", async function() {
         await truffleAssert.fails(
-            treasuryInstance.removeFunds(
-                testTokenInstance.address,
-                web3.utils.toBN(1), 
-                {from: account1}
-            ),
-            "Ownable: caller is not the owner"
+            this.treasury.connect(this.accounts[1]).removeFunds(
+                this.testToken.address,
+                BigNumber.from("1")
+            )
         );
     });
 });
 
-contract("Marketplace", async([deployer, account1, ...acounts]) => {
-    it("should list the NFT on the marketplace", async() => {
-        const marketplaceInstance = await Marketplace.deployed();
-        const testNFTInstance = await TestNFT.deployed();
+describe("Marketplace", function() {
+    beforeEach(async function() {
+        [this.deployer, ...this.accounts] = await ethers.getSigners();
 
-        await testNFTInstance.approve(marketplaceInstance.address, web3.utils.toBN(1), {from: deployer});
-        const deployerNftBalance = await testNFTInstance.balanceOf(deployer);
-        expect(true).to.equal(deployerNftBalance.eq(web3.utils.toBN(1)));
+        const Marketplace = await ethers.getContractFactory("Marketplace");
+        const TestNFT = await ethers.getContractFactory("TestNFT");
 
-        const nftPrice = web3.utils.toBN(10);
-
-        await marketplaceInstance.listNft(
-            testNFTInstance.address, 
-            web3.utils.toBN(1), 
-            web3.utils.toWei(nftPrice, "ether")
-        );
-
-        const offer = await marketplaceInstance.listOffers.call(deployer);
-        expect(true).to.equal(offer.tokenId.eq(web3.utils.toBN(1)));
-        expect(true).to.equal(offer.amount.eq(web3.utils.toWei(nftPrice, "ether")));
-        expect(false).to.equal(offer.closeOffer);
-        expect(testNFTInstance.address).to.equal(offer.nft);
-
-        const confirmOwnership = await testNFTInstance.ownerOf(web3.utils.toBN(1));
-        expect(confirmOwnership).to.equal(marketplaceInstance.address);
+        this.testNft = await TestNFT.deploy();
+        this.marketplace = await Marketplace.deploy();
     });
 
-    it("should delist the NFT from the marketplace", async() => {
-        const marketplaceInstance = await Marketplace.deployed();
-        const testNFTInstance = await TestNFT.deployed();
+    it("should list the NFT on the marketplace", async function() {
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        const deployerNftBalance = await this.testNft.balanceOf(this.deployer.address);
+        expect(deployerNftBalance).to.deep.equal(BigNumber.from("1"));
+
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice);
+
+        const offer = await this.marketplace.listOffers(this.deployer.address);
+        expect(offer["nft"]).to.equal(this.testNft.address);
+        expect(offer["tokenId"]).to.deep.equal(BigNumber.from("1"));
+        expect(offer["amount"]).to.deep.equal(nftPrice);
+        expect(offer["closeOffer"]).to.equal(false);
+
+        const confirmOwnership = await this.testNft.ownerOf(BigNumber.from("1"));
+        expect(confirmOwnership).to.equal(this.marketplace.address);
+    });
+
+    it("should delist the NFT from the marketplace", async function() {
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), BigNumber.from(ethers.utils.parseEther("10")));
 
         // @dev Marketplace contains the user's NFT
-        let marketplaceBalance = await testNFTInstance.balanceOf(marketplaceInstance.address);
-        expect(true).to.equal(marketplaceBalance.eq(web3.utils.toBN(1)));
+        let marketplaceNftBalance = await this.testNft.balanceOf(this.marketplace.address);
+        expect(marketplaceNftBalance).to.deep.equal(BigNumber.from("1"));
 
-        await marketplaceInstance.delistNft(testNFTInstance.address, web3.utils.toBN(1));
-        marketplaceBalance = await testNFTInstance.balanceOf(marketplaceInstance.address);
-        expect(true).to.equal(marketplaceBalance.eq(web3.utils.toBN(0)));
+        await this.marketplace.delistNft(this.testNft.address, BigNumber.from("1"));
+        marketplaceNftBalance = await this.testNft.balanceOf(this.marketplace.address);
+        expect(marketplaceNftBalance).to.deep.equal(BigNumber.from("0"));
 
-        const deployerNFTBalance = await testNFTInstance.balanceOf(deployer);
-        expect(true).to.equal(deployerNFTBalance.eq(web3.utils.toBN(1)));
+        const deployerNFtBalance = await this.testNft.balanceOf(this.deployer.address);
+        expect(deployerNFtBalance).to.deep.equal(BigNumber.from("1"));
 
-        const confirmOwnership = await testNFTInstance.ownerOf(web3.utils.toBN(1));
-        expect(confirmOwnership).to.equal(deployer);
-    });
-
-    it("account1 should make a bid", async() => {
-        const marketplaceInstance = await Marketplace.deployed();
-        const testNFTInstance = await TestNFT.deployed();
+        const confirmOwnership = await this.testNft.ownerOf(BigNumber.from("1"));
+        expect(confirmOwnership).to.deep.equal(this.deployer.address);
     });
 });

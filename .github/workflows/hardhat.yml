@@ -1,0 +1,8 @@
+- uses: actions/checkout@v2
+- name: Setup NodeJS 14
+  with:
+    node-version: '14'
+- name: Install all node modules
+  run: npm i
+- name: Run solidity tests
+  run: npx hardhat test

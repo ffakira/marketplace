@@ -1,6 +1,10 @@
 //SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.10;
 
+/**
+ * @title IMarketplace
+ * @notice The smart contract have not been audited
+ */
 interface IMarketplace {
     struct Offer {
         address buyer;
@@ -34,4 +38,8 @@ interface IMarketplace {
         uint256 indexed tokenId,
         address buyer
     );
+
+    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice) external;
+    function delistNft(address _nft, uint256 _tokenId) external;
+    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) external payable;
 }

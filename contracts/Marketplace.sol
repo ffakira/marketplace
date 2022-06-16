@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./interfaces/IMarketplace.sol";
 
@@ -14,7 +15,7 @@ import "./interfaces/IMarketplace.sol";
  * @title Marketplace
  * @notice The smart contract have not been audited. Use at your own risk!
  */
-contract Marketplace is Context, IERC721Receiver, IMarketplace {
+contract Marketplace is Context, IERC721Receiver, IMarketplace, ReentrancyGuard {
     mapping(address => List) public listOffers;
     mapping(address => mapping(uint256 => Offer[])) public biddingOffers;
 
@@ -68,7 +69,8 @@ contract Marketplace is Context, IERC721Receiver, IMarketplace {
      * @param _tokenId uint tokenId of ERC721
      * @param _offerPrice price to offer in wei
      */
-    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice) public {
+    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice) external {
+        
         listOffers[_msgSender()].nft = _nft;
         listOffers[_msgSender()].tokenId = _tokenId;
         listOffers[_msgSender()].amount = _offerPrice;
@@ -85,7 +87,7 @@ contract Marketplace is Context, IERC721Receiver, IMarketplace {
      * @param _nft address of ERC721
      * @param _tokenId uint tokenId of ERC721
      */
-    function delistNft(address _nft, uint256 _tokenId) public {
+    function delistNft(address _nft, uint256 _tokenId) external {
         IERC721(_nft).approve(_msgSender(), _tokenId);
         IERC721(_nft).safeTransferFrom(address(this), _msgSender(), _tokenId);
 
@@ -100,7 +102,7 @@ contract Marketplace is Context, IERC721Receiver, IMarketplace {
      * @param _tokenId uint tokenId of ERC721
      * @param _offerPrice price to offer 
      */
-    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) public payable {
+    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) external payable nonReentrant {
         (bool sent,) = address(this).call{value: _offerPrice}("");
         require(sent, "Marketplace: Failed to send ether");
         require(true, "Marketplace: Bid higher then the floor price");
