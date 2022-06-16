@@ -1,8 +1,13 @@
-- uses: actions/checkout@v2
-- name: Setup NodeJS 14
-  with:
-    node-version: '14'
-- name: Install all node modules
-  run: npm i
-- name: Run solidity tests
-  run: npx hardhat test
+name: Solidity unit test
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Use Node.js 12
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+      - run: npm test
