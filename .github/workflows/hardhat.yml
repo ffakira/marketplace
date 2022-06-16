@@ -1,6 +1,11 @@
 name: Solidity unit test
+
+on:
+  push:
+    branches: [ "master" ]
+
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
