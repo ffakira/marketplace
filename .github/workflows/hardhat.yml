@@ -4,10 +4,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Use Node.js 12
         uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: npm test
+      - name: Install node modules
+        run: npm i
+      - name: Unit test solidity
+        run: npx hardhat test
