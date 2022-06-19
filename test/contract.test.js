@@ -68,7 +68,7 @@ describe("Marketplace", function() {
         this.marketplace = await Marketplace.deploy();
     });
 
-    it("should list the NFT on the marketplace", async function() {
+    it("should list the ERC721 NFT on the marketplace", async function() {
         await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
         const deployerNftBalance = await this.testNft.balanceOf(this.deployer.address);
         expect(deployerNftBalance).to.deep.equal(BigNumber.from("1"));

@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Treasury is Ownable {
     function removeFunds(IERC20 _tokenAddress, uint256 _amount) public onlyOwner {
-        IERC20(_tokenAddress).transfer(_msgSender(), _amount);
+        if (address(_tokenAddress) != address(0)) {
+            IERC20(_tokenAddress).transfer(_msgSender(), _amount);
+        }
     }
 }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 /**
  * @title IMarketplace
- * @notice The smart contract have not been audited
+ * @notice The smart contract have not been audited. Use at your own risk!
  */
 interface IMarketplace {
     struct Offer {
@@ -14,6 +14,7 @@ interface IMarketplace {
     struct List {
         address nft;
         uint256 tokenId;
+        uint256 offerPrice;
         uint256 amount;
         uint256 createdAt;
         bool closeOffer;
@@ -39,7 +40,7 @@ interface IMarketplace {
         address buyer
     );
 
-    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice) external;
-    function delistNft(address _nft, uint256 _tokenId) external;
+    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice, uint256 _amount) external;
+    function delistNft(address _nft, uint256 _tokenId, uint256 _amount) external;
     function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) external payable;
 }
