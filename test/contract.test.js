@@ -63,45 +63,70 @@ describe("Marketplace", function() {
 
         const Marketplace = await ethers.getContractFactory("Marketplace");
         const TestNFT = await ethers.getContractFactory("TestNFT");
+        const TestNFT1155 = await ethers.getContractFactory("TestNFT1155");
+        const TestToken = await ethers.getContractFactory("TestToken");
 
         this.testNft = await TestNFT.deploy();
         this.marketplace = await Marketplace.deploy();
+        this.testNft1155 = await TestNFT1155.deploy();
+        this.testToken = await TestToken.deploy();
     });
 
     it("should list the ERC721 NFT on the marketplace", async function() {
         await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
         const deployerNftBalance = await this.testNft.balanceOf(this.deployer.address);
-        expect(deployerNftBalance).to.deep.equal(BigNumber.from("1"));
+        expect(BigNumber.from("1")).to.deep.equal(deployerNftBalance);
 
         const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
-        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice);
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
 
         const offer = await this.marketplace.listOffers(this.deployer.address);
-        expect(offer["nft"]).to.equal(this.testNft.address);
-        expect(offer["tokenId"]).to.deep.equal(BigNumber.from("1"));
-        expect(offer["amount"]).to.deep.equal(nftPrice);
-        expect(offer["closeOffer"]).to.equal(false);
+        expect(this.testNft.address).to.equal(offer["nft"]);
+        expect(BigNumber.from("1")).to.deep.equal(offer["tokenId"]);
+        expect(nftPrice).to.deep.equal(offer["offerPrice"]);
+        expect(false).to.equal(offer["closeOffer"]);
 
         const confirmOwnership = await this.testNft.ownerOf(BigNumber.from("1"));
-        expect(confirmOwnership).to.equal(this.marketplace.address);
+        expect(this.marketplace.address).to.equal(confirmOwnership);
     });
 
-    it("should delist the NFT from the marketplace", async function() {
+    it("should list the ERC1155 NFT on the marketplace", async function() {
+        await this.testNft1155.connect(this.deployer).setApprovalForAll(this.marketplace.address, true);
+        const isApproved = await this.testNft1155.isApprovedForAll(this.deployer.address, this.marketplace.address);
+        expect(true).to.equal(isApproved);
+
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+        await this.marketplace.listNft(this.testNft1155.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
+
+        const offer = await this.marketplace.listOffers(this.deployer.address);
+        expect(this.testNft1155.address).to.equal(offer["nft"]);
+        expect(BigNumber.from("1")).to.deep.equal(offer["tokenId"]);
+        expect(nftPrice).to.deep.equal(offer["offerPrice"]);
+        expect(false).to.equal(offer["closeOffer"]);
+    });
+
+    it("should fail listing an ERC20 on the marketplace", async function() {
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+
+        await truffleAssert.fails(
+            this.marketplace.listNft(this.testToken.address, BigNumber.from("1"), nftPrice, BigNumber.from("1")),
+            "Marketplace: Not compatible token"
+        );
+    });
+
+    it("should delist ERC721 from the marketplace", async function() {
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
         await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
-        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), BigNumber.from(ethers.utils.parseEther("10")));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
 
-        // @dev Marketplace contains the user's NFT
-        let marketplaceNftBalance = await this.testNft.balanceOf(this.marketplace.address);
-        expect(marketplaceNftBalance).to.deep.equal(BigNumber.from("1"));
+        let balanceOf = await this.testNft.balanceOf(this.deployer.address);
+        expect(BigNumber.from("0")).to.deep.equal(balanceOf);
 
-        await this.marketplace.delistNft(this.testNft.address, BigNumber.from("1"));
-        marketplaceNftBalance = await this.testNft.balanceOf(this.marketplace.address);
-        expect(marketplaceNftBalance).to.deep.equal(BigNumber.from("0"));
+        await this.marketplace.delistNft(this.testNft.address, BigNumber.from("1"), BigNumber.from("0"));
+        balanceOf = await this.testNft.balanceOf(this.deployer.address);
+        expect(BigNumber.from("1")).to.deep.equal(balanceOf);
 
-        const deployerNFtBalance = await this.testNft.balanceOf(this.deployer.address);
-        expect(deployerNFtBalance).to.deep.equal(BigNumber.from("1"));
-
-        const confirmOwnership = await this.testNft.ownerOf(BigNumber.from("1"));
-        expect(confirmOwnership).to.deep.equal(this.deployer.address);
+        const marketplaceBalance = await this.testNft.balanceOf(this.marketplace.address);
+        expect(BigNumber.from("0")).to.deep.equal(marketplaceBalance);
     });
 });

@@ -18,8 +18,14 @@ import "./interfaces/IMarketplace.sol";
  */
 contract Marketplace is Context, IMarketplace, ReentrancyGuard {
     using ERC165Checker for address;
+
     bytes4 private _interfaceIdERC721 = 0x80ac58cd;
-    bytes4 private _interfaceIdERC1155 = 0xf23a6e61;
+
+    /**
+     * @dev Reference to ERC1155 standard, and where the interfaceId is coming from
+     * https://info.etherscan.com/erc-1155-the-multi-token-standard/
+     */
+    bytes4 private _interfaceIdERC1155 = 0xd9b67a26;
     
     mapping(address => List) public listOffers;
     mapping(address => mapping(uint256 => Offer[])) public biddingOffers;
@@ -69,12 +75,14 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
 
     function _transferERC721(address _sender, address _erc721, uint256 _tokenId, uint256 _offerPrice) internal {
         require(_erc721 != address(0) || _sender != address(0), "Marketplace: invalid operation for zero address");
-        listOffers[_sender].nft = _erc721;
-        listOffers[_sender].tokenId = _tokenId;
-        listOffers[_sender].amount = 1;
-        listOffers[_sender].offerPrice = _offerPrice;
-        listOffers[_sender].createdAt = block.timestamp;
-        listOffers[_sender].closeOffer = false;
+        listOffers[_sender] = List({
+            nft: _erc721,
+            tokenId: _tokenId,
+            amount: 1,
+            offerPrice: _offerPrice,
+            createdAt: block.timestamp,
+            closeOffer: false
+        });
 
         IERC721(_erc721).safeTransferFrom(_sender, address(this), _tokenId);
         emit ListNft(_sender, _erc721, _tokenId, _offerPrice);
@@ -91,12 +99,15 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
     function _transferERC1155(address _sender, address _erc1155, uint256 _tokenId, uint256 _amount, uint256 _offerPrice) internal {
         require(_amount > 0, "Marketplace: cannot transfer 0 amount of tokens");
         require(_erc1155 != address(0) || _sender != address(0), "Marketplace: invalid operation for zero address");
-        listOffers[_sender].nft = _erc1155;
-        listOffers[_sender].tokenId = _tokenId;
-        listOffers[_sender].amount = _amount;
-        listOffers[_sender].offerPrice = _offerPrice;
-        listOffers[_sender].createdAt = block.timestamp;
-        listOffers[_sender].closeOffer = false;
+
+        listOffers[_sender] = List({
+            nft: _erc1155,
+            tokenId: _tokenId,
+            amount: _amount,
+            offerPrice: _offerPrice,
+            createdAt: block.timestamp,
+            closeOffer: false
+        });
 
         IERC1155(_erc1155).safeTransferFrom(_sender, address(this), _tokenId, _amount, "");
         emit ListNft(_sender, _erc1155, _tokenId, _offerPrice);
@@ -112,14 +123,14 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
     }
 
     /**
-     * @notice Is not tested if it supports ERC1155
+     * @notice Is not tested if it supports ERC721A
      * @dev Transfers ERC721 or ERC1155 to Marketplace contract
      * @param _nft address of ERC721 or ERC1155
      * @param _tokenId uint tokenId of ERC721 or ERC1155
      * @param _offerPrice price to offer in wei
      * @param _amount amount of tokens for ERC1155
      */
-    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice, uint256 _amount) external {
+    function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice, uint256 _amount) external nonReentrant {
         bool supportERC721 = _nft.supportsInterface(_interfaceIdERC721);
         bool supportERC1155 = _nft.supportsInterface(_interfaceIdERC1155);
         require(supportERC721 || supportERC1155, "Marketplace: Not compatible token");
@@ -134,13 +145,13 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
     }
 
     /**
-     * @notice Is not tested if it supports ERC1155
-     * @dev Transfers ERC721 back to sender
-     * @param _nft address of ERC721
-     * @param _tokenId uint tokenId of ERC721
+     * @notice Is not tested if it supports ERC721A
+     * @dev Transfers ERC721 or ERC1155 back to sender
+     * @param _nft address of ERC721 or ERC1155
+     * @param _tokenId uint tokenId of ERC721 or ERC1155
      * @param _amount amount of tokens for ERC1155
      */
-    function delistNft(address _nft, uint256 _tokenId, uint256 _amount) external {
+    function delistNft(address _nft, uint256 _tokenId, uint256 _amount) external nonReentrant {
         bool supportERC721 = _nft.supportsInterface(_interfaceIdERC721);
         bool supportERC1155 = _nft.supportsInterface(_interfaceIdERC1155);
         require(supportERC721 || supportERC1155, "Marketplace: Not compatible token");
