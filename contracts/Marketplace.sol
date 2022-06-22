@@ -3,11 +3,12 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./interfaces/IMarketplace.sol";
@@ -16,8 +17,9 @@ import "./interfaces/IMarketplace.sol";
  * @title Marketplace
  * @notice The smart contract have not been audited. Use at your own risk!
  */
-contract Marketplace is Context, IMarketplace, ReentrancyGuard {
+contract Marketplace is IMarketplace, ReentrancyGuard, Ownable {
     using ERC165Checker for address;
+    using SafeERC20 for IERC20;
 
     bytes4 private _interfaceIdERC721 = 0x80ac58cd;
 
@@ -26,9 +28,23 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
      * https://info.etherscan.com/erc-1155-the-multi-token-standard/
      */
     bytes4 private _interfaceIdERC1155 = 0xd9b67a26;
-    
+
     mapping(address => List) public listOffers;
     mapping(address => mapping(uint256 => Offer[])) public biddingOffers;
+    mapping(address => bool) public whitelistTokens;
+
+    constructor(address[] memory _tokenAddress) {
+        for(uint256 i; i < _tokenAddress.length; i++) {
+            whitelistTokens[_tokenAddress[i]] = true;
+        }
+    }
+
+    receive() external payable {}
+    fallback() external payable {}
+
+    function configTokens(address _tokenAddress, bool _isWhitelist) public onlyOwner {
+        whitelistTokens[_tokenAddress] = _isWhitelist;
+    }
 
     /**
      * @dev Whenever an {IERC721} `tokenId` token is transferred to this contract via {IERC721-safeTransferFrom}
@@ -166,21 +182,48 @@ contract Marketplace is Context, IMarketplace, ReentrancyGuard {
     }
 
     /**
-     * @notice Is not tested if it supports ERC1155
+     * @notice Is not tested if it supports ERC721A
      * @dev Bid a price and transfer ETH to an escrow
-     * @param _nft address of ERC721
-     * @param _tokenId uint tokenId of ERC721
+     * @param _nft address of ERC721 or ERC1155
+     * @param _tokenId uint tokenId of ERC721 or ERC1155
+     * @param _tokenAddress ERC20 token address
      * @param _offerPrice price to offer 
      */
-    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) external payable nonReentrant {
-        (bool sent,) = address(this).call{value: _offerPrice}("");
-        require(sent, "Marketplace: Failed to send ether");
-        require(true, "Marketplace: Bid higher then the floor price");
+    function offerBid(address _nft, uint256 _tokenId, address _tokenAddress, uint256 _offerPrice) external payable nonReentrant {
+        require(_offerPrice > 0, "Marketplace: Cannot transfer 0 amount");
+        require(!listOffers[_tokenAddress].closeOffer, "Marketplace: offer been closed");
 
-        biddingOffers[_nft][_tokenId].push(Offer({
-            buyer: _msgSender(),
-            offerPrice: _offerPrice
-        }));
-        emit BiddingOffer(_nft, _offerPrice, _tokenId, _msgSender());
+        if (_tokenAddress == address(0)) {
+            (bool sent,) = address(this).call{value: _offerPrice}("");
+            require(sent, "Marketplace: Failed to send ether");
+            biddingOffers[_nft][_tokenId].push(Offer({
+                buyer: _msgSender(),
+                offerPrice: _offerPrice,
+                tokenAddress: address(0)
+            }));
+
+            emit BiddingOffer(_nft, _offerPrice, _tokenId, _msgSender());
+
+        } else {
+            require(whitelistTokens[_tokenAddress], "Marketplace: token not supported");
+            IERC20(_tokenAddress).safeTransferFrom(_msgSender(), address(this), _offerPrice);
+            biddingOffers[_nft][_tokenId].push(Offer({
+                buyer: _msgSender(),
+                offerPrice: _offerPrice,
+                tokenAddress: _tokenAddress
+            }));
+
+            emit BiddingOffer(_nft, _offerPrice, _tokenId, _msgSender());
+        }
     }
+
+    function getBiddingOffers(address _nft, uint256 _tokenId) public view returns(Offer[] memory) {
+        return biddingOffers[_nft][_tokenId];
+    }
+
+    // function cancelBid(address _nft, uint256 _tokenId) external nonReentrant {
+    //     Offer[] offers = biddingOffers[_nft][_tokenId];
+    //     for (uint256 i = 0; i < offers.length; i++) {
+    //     }
+    // }
 }

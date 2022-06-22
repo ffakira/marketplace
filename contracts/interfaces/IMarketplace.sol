@@ -8,6 +8,7 @@ pragma solidity ^0.8.10;
 interface IMarketplace {
     struct Offer {
         address buyer;
+        address tokenAddress;
         uint256 offerPrice;
     }
 
@@ -40,7 +41,15 @@ interface IMarketplace {
         address buyer
     );
 
+    event CancelOffer(
+        address indexed nft,
+        address indexed buyer,
+        uint256 indexed offerPrice,
+        address tokenAddress
+    );
+
     function listNft(address _nft, uint256 _tokenId, uint256 _offerPrice, uint256 _amount) external;
     function delistNft(address _nft, uint256 _tokenId, uint256 _amount) external;
-    function offerBidPrice(address _nft, uint256 _tokenId, uint256 _offerPrice) external payable;
+    function offerBid(address _nft, uint256 _tokenId, address _tokenAddress, uint256 _offerPrice) external payable;
+    // function cancelBid(address _nft, uint256 _tokenId) external;
 }
