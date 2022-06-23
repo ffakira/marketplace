@@ -13,7 +13,7 @@ $ npm i
 * The tests were run on WSL2 (Ubuntu 20.04) at Windows 10 (19044.1706)
 * Node 16.15.1 and npm 8.12.1
 
-Open terminal 1: start running local ganacha at `port 8545`
+Open terminal 1: start running local ganache at `port 8545`
 
 ```sh
 $ npm run ganache

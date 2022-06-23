@@ -33,12 +33,6 @@ contract Marketplace is IMarketplace, ReentrancyGuard, Ownable {
     mapping(address => mapping(uint256 => Offer[])) public biddingOffers;
     mapping(address => bool) public whitelistTokens;
 
-    constructor(address[] memory _tokenAddress) {
-        for(uint256 i; i < _tokenAddress.length; i++) {
-            whitelistTokens[_tokenAddress[i]] = true;
-        }
-    }
-
     receive() external payable {}
     fallback() external payable {}
 
@@ -194,7 +188,7 @@ contract Marketplace is IMarketplace, ReentrancyGuard, Ownable {
         require(!listOffers[_tokenAddress].closeOffer, "Marketplace: offer been closed");
 
         if (_tokenAddress == address(0)) {
-            (bool sent,) = address(this).call{value: _offerPrice}("");
+            (bool sent,) = payable(address(this)).call{value: _offerPrice}("");
             require(sent, "Marketplace: Failed to send ether");
             biddingOffers[_nft][_tokenId].push(Offer({
                 buyer: _msgSender(),
@@ -217,13 +211,17 @@ contract Marketplace is IMarketplace, ReentrancyGuard, Ownable {
         }
     }
 
+    // function cancelBid(address _nft, uint256 _tokenId) external nonReentrant {
+    //     Offer[] storage offers = biddingOffers[_nft][_tokenId];
+    //     for (uint256 i = 0; i < offers.length; i++) {
+    //     }
+    // }
+
     function getBiddingOffers(address _nft, uint256 _tokenId) public view returns(Offer[] memory) {
         return biddingOffers[_nft][_tokenId];
     }
 
-    // function cancelBid(address _nft, uint256 _tokenId) external nonReentrant {
-    //     Offer[] offers = biddingOffers[_nft][_tokenId];
-    //     for (uint256 i = 0; i < offers.length; i++) {
-    //     }
-    // }
+    function getBalance() public view returns(uint256) {
+        return address(this).balance;
+    }
 }

@@ -129,4 +129,76 @@ describe("Marketplace", function() {
         const marketplaceBalance = await this.testNft.balanceOf(this.marketplace.address);
         expect(BigNumber.from("0")).to.deep.equal(marketplaceBalance);
     });
+
+    it("should make an offer to NFT with eth", async function() {
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("1"));
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
+
+        await this.marketplace.connect(this.accounts[1]).offerBid(
+            this.testNft.address, BigNumber.from("1"), `0x${'0'.repeat(40)}`, nftPrice,
+            { value: nftPrice }
+        );
+
+        const [getBiddingOffer] = await this.marketplace.getBiddingOffers(this.testNft.address, BigNumber.from("1"));
+        expect(`0x${'0'.repeat(40)}`).to.equal(getBiddingOffer["tokenAddress"]);
+        expect(this.accounts[1].address).to.equal(getBiddingOffer["buyer"]);
+        expect(nftPrice).to.deep.equal(getBiddingOffer["offerPrice"]);
+
+        const marketplaceBalance = await this.marketplace.getBalance();
+        expect(nftPrice).to.deep.equal(marketplaceBalance);
+    });
+
+    it("should make an offer to NFT with ERC20", async function() {
+        //@dev transfer 10ETH token to account1
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+        await this.testToken.transfer(this.accounts[1].address, nftPrice);
+
+        let account1 = await this.testToken.balanceOf(this.accounts[1].address);
+        expect(nftPrice).to.deep.equal(account1);
+
+        //@dev list nft from account0
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
+
+        //@dev make an offer from account1 with ERC20
+        await this.marketplace.configTokens(this.testToken.address, true);
+        await this.testToken.connect(this.accounts[1]).approve(this.marketplace.address, nftPrice);
+        await this.marketplace.connect(this.accounts[1]).offerBid(
+            this.testNft.address, BigNumber.from("1"), this.testToken.address, nftPrice
+        );
+
+        const marketplaceBalance = await this.testToken.balanceOf(this.marketplace.address);
+        expect(nftPrice).to.deep.equal(marketplaceBalance);
+    });
+
+    it("shoud fail offering 0 amount", async function() {
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
+        
+        await truffleAssert.fails(
+            this.marketplace.connect(this.accounts[1]).offerBid(
+                this.testNft.address, BigNumber.from("1"), `0x${'0'.repeat(40)}`, BigNumber.from("0"),
+                { value: BigNumber.from("0") }
+            ),
+            "Marketplace: Cannot transfer 0 amount"
+        );
+    });
+
+    it("should fail to transfer non-whitelisted address", async function() {
+        const nftPrice = BigNumber.from(ethers.utils.parseEther("10"));
+        await this.testToken.transfer(this.accounts[1].address, nftPrice);
+
+        await this.testNft.approve(this.marketplace.address, BigNumber.from("1"));
+        await this.marketplace.listNft(this.testNft.address, BigNumber.from("1"), nftPrice, BigNumber.from("1"));
+
+        await this.testToken.connect(this.accounts[1]).approve(this.marketplace.address, nftPrice);
+        await truffleAssert.fails(
+            this.marketplace.connect(this.accounts[1]).offerBid(
+                this.testNft.address, BigNumber.from("1"), this.testToken.address, nftPrice
+            ),
+            "Marketplace: token not supported"
+        );
+    });
 });
